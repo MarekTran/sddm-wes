@@ -13,12 +13,12 @@ ColumnLayout {
     // Font loaders for Jost fonts
     FontLoader {
         id: jostBlack
-        source: Qt.resolvedUrl("Fonts/Jost-900-Black.ttf")
+        source: Qt.resolvedUrl("../Fonts/Jost-900-Black.ttf")
     }
     
     FontLoader {
         id: jostMediumItalic
-        source: Qt.resolvedUrl("Fonts/Jost-500-MediumItalic.ttf")
+        source: Qt.resolvedUrl("../Fonts/Jost-500-MediumItalic.ttf")
     }
     
     Timer {
@@ -45,7 +45,7 @@ ColumnLayout {
         text: Qt.formatTime(currentTime, "hh:mm AP")
         color: "white"  // Keeping white as requested
         font.family: jostMediumItalic.name
-        font.pixelSize: Kirigami.Units.gridUnit * 5
+        font.pixelSize: Kirigami.Units.gridUnit * 4
         font.italic: true
         font.weight: Font.Medium
         Layout.alignment: Qt.AlignHCenter

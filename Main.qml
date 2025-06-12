@@ -141,180 +141,189 @@ Item {
             Layout.alignment: Qt.AlignBaseline
         }
 
-        QQC2.StackView {
-            id: mainStack
-            anchors {
-                left: parent.left
-                right: parent.right
-            }
-            height: root.height + Kirigami.Units.gridUnit * 3
+        // Container to position the login block
+        Item {
+            id: loginContainer
+            anchors.fill: parent
+            // Move the entire container down
+            anchors.topMargin: Kirigami.Units.gridUnit * 17  // Adjust this to move the login block down
 
-            // If true (depends on the style and environment variables), hover events are always accepted
-            // and propagation stopped. This means the parent MouseArea won't get them and the UI won't be shown.
-            // Disable capturing those events while the UI is hidden to avoid that, while still passing events otherwise.
-            // One issue is that while the UI is visible, mouse activity won't keep resetting the timer, but when it
-            // finally expires, the next event should immediately set uiVisible = true again.
-            hoverEnabled: loginScreenRoot.uiVisible ? undefined : false
+            QQC2.StackView {
+                id: mainStack
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                }
+                height: root.height + Kirigami.Units.gridUnit * 3
 
-            focus: true //StackView is an implicit focus scope, so we need to give this focus so the item inside will have it
+                // If true (depends on the style and environment variables), hover events are always accepted
+                // and propagation stopped. This means the parent MouseArea won't get them and the UI won't be shown.
+                // Disable capturing those events while the UI is hidden to avoid that, while still passing events otherwise.
+                // One issue is that while the UI is visible, mouse activity won't keep resetting the timer, but when it
+                // finally expires, the next event should immediately set uiVisible = true again.
+                hoverEnabled: loginScreenRoot.uiVisible ? undefined : false
 
-            Timer {
-                //SDDM has a bug in 0.13 where even though we set the focus on the right item within the window, the window doesn't have focus
-                //it is fixed in 6d5b36b28907b16280ff78995fef764bb0c573db which will be 0.14
-                //we need to call "window->activate()" *After* it's been shown. We can't control that in QML so we use a shoddy timer
-                //it's been this way for all Plasma 5.x without a huge problem
-                running: true
-                repeat: false
-                interval: 200
-                onTriggered: mainStack.forceActiveFocus()
-            }
+                focus: true //StackView is an implicit focus scope, so we need to give this focus so the item inside will have it
 
-            initialItem: Login {
-                id: userListComponent
-                userListModel: userModel
-                loginScreenUiVisible: loginScreenRoot.uiVisible
-                userListCurrentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
-                lastUserName: userModel.lastUser
-                showUserList: {
-                    if (!userListModel.hasOwnProperty("count")
-                        || !userListModel.hasOwnProperty("disableAvatarsThreshold")) {
-                        return false
+                Timer {
+                    //SDDM has a bug in 0.13 where even though we set the focus on the right item within the window, the window doesn't have focus
+                    //it is fixed in 6d5b36b28907b16280ff78995fef764bb0c573db which will be 0.14
+                    //we need to call "window->activate()" *After* it's been shown. We can't control that in QML so we use a shoddy timer
+                    //it's been this way for all Plasma 5.x without a huge problem
+                    running: true
+                    repeat: false
+                    interval: 200
+                    onTriggered: mainStack.forceActiveFocus()
+                }
+
+                initialItem: Login {
+                    id: userListComponent
+                    userListModel: userModel
+                    loginScreenUiVisible: loginScreenRoot.uiVisible
+                    userListCurrentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
+                    lastUserName: userModel.lastUser
+                    showUserList: {
+                        if (!userListModel.hasOwnProperty("count")
+                            || !userListModel.hasOwnProperty("disableAvatarsThreshold")) {
+                            return false
+                        }
+
+                        if (userListModel.count === 0 ) {
+                            return false
+                        }
+
+                        if (userListModel.hasOwnProperty("containsAllUsers") && !userListModel.containsAllUsers) {
+                            return false
+                        }
+
+                        return userListModel.count <= userListModel.disableAvatarsThreshold
                     }
 
-                    if (userListModel.count === 0 ) {
-                        return false
+                    notificationMessage: {
+                        const parts = [];
+                        if (capsLockState.locked) {
+                            parts.push(i18nd("plasma-desktop-sddm-theme", "Caps Lock is on"));
+                        }
+                        if (root.notificationMessage) {
+                            parts.push(root.notificationMessage);
+                        }
+                        return parts.join(" • ");
                     }
 
-                    if (userListModel.hasOwnProperty("containsAllUsers") && !userListModel.containsAllUsers) {
-                        return false
+                    actionItemsVisible: !inputPanel.keyboardActive
+                    actionItems: [
+                        ActionButton {
+                            icon.name: "system-suspend"
+                            text: i18ndc("plasma-desktop-sddm-theme", "Suspend to RAM", "Sleep")
+                            onClicked: sddm.suspend()
+                            enabled: sddm.canSuspend
+                        },
+                        ActionButton {
+                            icon.name: "system-reboot"
+                            text: i18nd("plasma-desktop-sddm-theme", "Restart")
+                            onClicked: sddm.reboot()
+                            enabled: sddm.canReboot
+                        },
+                        ActionButton {
+                            icon.name: "system-shutdown"
+                            text: i18nd("plasma-desktop-sddm-theme", "Shut Down")
+                            onClicked: sddm.powerOff()
+                            enabled: sddm.canPowerOff
+                        },
+                        ActionButton {
+                            icon.name: "system-user-prompt"
+                            text: i18ndc("plasma-desktop-sddm-theme", "For switching to a username and password prompt", "Other…")
+                            onClicked: mainStack.push(userPromptComponent)
+                            visible: !userListComponent.showUsernamePrompt
+                        }]
+
+                    onLoginRequest: {
+                        root.notificationMessage = ""
+                        sddm.login(username, password, sessionButton.currentIndex)
                     }
-
-                    return userListModel.count <= userListModel.disableAvatarsThreshold
                 }
 
-                notificationMessage: {
-                    const parts = [];
-                    if (capsLockState.locked) {
-                        parts.push(i18nd("plasma-desktop-sddm-theme", "Caps Lock is on"));
+                Behavior on opacity {
+                    OpacityAnimator {
+                        duration: Kirigami.Units.longDuration
                     }
-                    if (root.notificationMessage) {
-                        parts.push(root.notificationMessage);
+                }
+
+                readonly property real zoomFactor: 1.5
+
+                popEnter: Transition {
+                    ScaleAnimator {
+                        from: mainStack.zoomFactor
+                        to: 1
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
                     }
-                    return parts.join(" • ");
+                    OpacityAnimator {
+                        from: 0
+                        to: 1
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
                 }
 
-                actionItemsVisible: !inputPanel.keyboardActive
-                actionItems: [
-                    ActionButton {
-                        icon.name: "system-suspend"
-                        text: i18ndc("plasma-desktop-sddm-theme", "Suspend to RAM", "Sleep")
-                        onClicked: sddm.suspend()
-                        enabled: sddm.canSuspend
-                    },
-                    ActionButton {
-                        icon.name: "system-reboot"
-                        text: i18nd("plasma-desktop-sddm-theme", "Restart")
-                        onClicked: sddm.reboot()
-                        enabled: sddm.canReboot
-                    },
-                    ActionButton {
-                        icon.name: "system-shutdown"
-                        text: i18nd("plasma-desktop-sddm-theme", "Shut Down")
-                        onClicked: sddm.powerOff()
-                        enabled: sddm.canPowerOff
-                    },
-                    ActionButton {
-                        icon.name: "system-user-prompt"
-                        text: i18ndc("plasma-desktop-sddm-theme", "For switching to a username and password prompt", "Other…")
-                        onClicked: mainStack.push(userPromptComponent)
-                        visible: !userListComponent.showUsernamePrompt
-                    }]
-
-                onLoginRequest: {
-                    root.notificationMessage = ""
-                    sddm.login(username, password, sessionButton.currentIndex)
+                popExit: Transition {
+                    ScaleAnimator {
+                        from: 1
+                        to: 1 / mainStack.zoomFactor
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
+                    OpacityAnimator {
+                        from: 1
+                        to: 0
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
                 }
-            }
 
-            Behavior on opacity {
-                OpacityAnimator {
-                    duration: Kirigami.Units.longDuration
+                pushEnter: Transition {
+                    ScaleAnimator {
+                        from: 1 / mainStack.zoomFactor
+                        to: 1
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
+                    OpacityAnimator {
+                        from: 0
+                        to: 1
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
                 }
-            }
 
-            readonly property real zoomFactor: 1.5
-
-            popEnter: Transition {
-                ScaleAnimator {
-                    from: mainStack.zoomFactor
-                    to: 1
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-                OpacityAnimator {
-                    from: 0
-                    to: 1
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
+                pushExit: Transition {
+                    ScaleAnimator {
+                        from: 1
+                        to: mainStack.zoomFactor
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
+                    OpacityAnimator {
+                        from: 1
+                        to: 0
+                        duration: Kirigami.Units.veryLongDuration
+                        easing.type: Easing.OutCubic
+                    }
                 }
             }
 
-            popExit: Transition {
-                ScaleAnimator {
-                    from: 1
-                    to: 1 / mainStack.zoomFactor
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-                OpacityAnimator {
-                    from: 1
-                    to: 0
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
+            VirtualKeyboardLoader {
+                id: inputPanel
+
+                z: 1
+
+                screenRoot: root
+                mainStack: mainStack
+                mainBlock: userListComponent
+                passwordField: userListComponent.mainPasswordBox
             }
-
-            pushEnter: Transition {
-                ScaleAnimator {
-                    from: 1 / mainStack.zoomFactor
-                    to: 1
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-                OpacityAnimator {
-                    from: 0
-                    to: 1
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-            }
-
-            pushExit: Transition {
-                ScaleAnimator {
-                    from: 1
-                    to: mainStack.zoomFactor
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-                OpacityAnimator {
-                    from: 1
-                    to: 0
-                    duration: Kirigami.Units.veryLongDuration
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
-
-        VirtualKeyboardLoader {
-            id: inputPanel
-
-            z: 1
-
-            screenRoot: root
-            mainStack: mainStack
-            mainBlock: userListComponent
-            passwordField: userListComponent.mainPasswordBox
-        }
+        }  // End of loginContainer
 
         Component {
             id: userPromptComponent
