@@ -43,6 +43,13 @@ SessionManagementScreen {
         Qt.callLater(focusFirstVisibleFormControl);
     }
 
+    Component.onCompleted: {
+        // Ensure password field gets focus on startup
+        if (!showUsernamePrompt || lastUserName) {
+            passwordBox.forceActiveFocus();
+        }
+    }
+
     function focusFirstVisibleFormControl() {
         const nextControl = (userNameInput.visible
             ? userNameInput

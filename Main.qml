@@ -174,7 +174,13 @@ Item {
                     running: true
                     repeat: false
                     interval: 200
-                    onTriggered: mainStack.forceActiveFocus()
+                    onTriggered: {
+                        mainStack.forceActiveFocus()
+                        // Ensure password field gets focus
+                        if (userListComponent.mainPasswordBox && userListComponent.mainPasswordBox.visible) {
+                            userListComponent.mainPasswordBox.forceActiveFocus()
+                        }
+                    }
                 }
 
                 initialItem: Login {
